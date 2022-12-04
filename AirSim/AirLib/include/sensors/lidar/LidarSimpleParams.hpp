@@ -27,6 +27,7 @@ struct LidarSimpleParams {
     };        
 
     bool draw_debug_points = false;
+    bool is_livox = false;
 
     void initializeFromSettings(const AirSimSettings::LidarSetting& settings)
     {
@@ -37,6 +38,8 @@ struct LidarSimpleParams {
 
         horizontal_FOV_start = settings.horizontal_FOV_start;
         horizontal_FOV_end = settings.horizontal_FOV_end;
+
+        is_livox = settings.is_livox;
 
         // By default, for multirotors the lidars FOV point downwards;
         // for cars, the lidars FOV is more forward facing.

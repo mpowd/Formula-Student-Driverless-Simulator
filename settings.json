@@ -37,7 +37,8 @@
             "HorizontalFOVStart": -90,
             "HorizontalFOVEnd": 90,
             "RotationsPerSecond": 10,
-            "DrawDebugPoints": false
+            "DrawDebugPoints": false,
+            "IsLivox": false
           },
           "Lidar2": {
             "SensorType": 6,
@@ -51,7 +52,23 @@
             "HorizontalFOVStart": -90,
             "HorizontalFOVEnd": 90,
             "RotationsPerSecond": 5,
-            "DrawDebugPoints": false
+            "DrawDebugPoints": false,
+            "IsLivox": false
+          },
+          "Livox": {
+            "SensorType": 6,
+            "Enabled": true,
+            "X": 1.20, "Y": 0, "Z": 0.2,
+            "Roll": 0, "Pitch": 0, "Yaw" : 0,
+            "NumberOfLasers": 1,
+            "PointsPerScan": 24000,
+            "VerticalFOVUpper": 12.55,
+            "VerticalFOVLower": -12.55,
+            "HorizontalFOVStart": -40.85,
+            "HorizontalFOVEnd": 40.85,
+            "RotationsPerSecond": 5,
+            "DrawDebugPoints": true,
+            "IsLivox": true
           },
           "GSS" : {
             "SensorType": 7,
