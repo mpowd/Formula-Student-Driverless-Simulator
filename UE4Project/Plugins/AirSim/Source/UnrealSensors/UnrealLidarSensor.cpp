@@ -62,8 +62,64 @@ void UnrealLidarSensor::getPointCloud(const msr::airlib::Pose& lidar_pose, const
     // calculate needed angle/distance between each point
     const float angle_distance_of_laser_measure = (laser_end - laser_start) / float(points_to_scan_with_one_laser);
 
+    const int points_per_scan = 24000;
+    int segments = 149;
+
+    if(params.is_livox) {
+        for (auto laser = 0u; laser < params.number_of_lasers; ++laser)
+        {
+            for (auto i = 0u; i < points_to_scan_with_one_laser; ++i)
+            {
+                //const float horizontal_angle = std::fmod(laser_start + angle_distance_of_laser_measure * i, 360.0f);
+                //const float vertical_angle = laser_angles_[laser];
+                float A_x = 25/2 * sin(2 * PI * (std::fmod(i, segments) / segments)) + 27.5;
+                float A_y = cos(2 * PI * (std::fmod(i, segments) / segments)) + 2;
+                float phi_x = 0;
+                float phi_y = 12 * sin(4 * PI * (std::fmod(i, segments)) / segments);
+                const float horizontal_angle = A_x * sin(2 * PI * i / points_per_scan) + phi_x;
+                const float vertical_angle = A_y * cos(2 * PI * i / points_per_scan) * 0.2 * sin(2 * PI * i / points_per_scan) + 0.5 * phi_y;
+
+        
+                Vector3r point;
+                int segmentationID = -1;
+                // shoot laser and get the impact point, if any
+                if (shootLaser(lidar_pose, vehicle_pose, laser, horizontal_angle, vertical_angle, params, point, segmentationID))
+                {
+                    point_cloud.emplace_back(point.x());
+                    point_cloud.emplace_back(point.y());
+                    point_cloud.emplace_back(point.z());
+                    segmentation_cloud.emplace_back(segmentationID);
+                }
+            }
+        }
+    } else {
+        for (auto laser = 0u; laser < params.number_of_lasers; ++laser)
+    {
+        const float vertical_angle = laser_angles_[laser];
+        for (auto i = 0u; i < points_to_scan_with_one_laser; ++i)
+        {
+            const float horizontal_angle = std::fmod(laser_start + angle_distance_of_laser_measure * i, 360.0f);
+
+       
+            Vector3r point;
+            int segmentationID = -1;
+            // shoot laser and get the impact point, if any
+            if (shootLaser(lidar_pose, vehicle_pose, laser, horizontal_angle, vertical_angle, params, point, segmentationID))
+            {
+                point_cloud.emplace_back(point.x());
+                point_cloud.emplace_back(point.y());
+                point_cloud.emplace_back(point.z());
+                segmentation_cloud.emplace_back(segmentationID);
+            }
+        }
+    }
+    }
+
+
+
+
     // shoot lasers
-    for (auto laser = 0u; laser < params.number_of_lasers; ++laser)
+    /* for (auto laser = 0u; laser < params.number_of_lasers; ++laser)
     {
         const float vertical_angle = laser_angles_[laser];
 
@@ -82,7 +138,7 @@ void UnrealLidarSensor::getPointCloud(const msr::airlib::Pose& lidar_pose, const
                 segmentation_cloud.emplace_back(segmentationID);
             }
         }
-    }
+    } */
 
     return;
 }
