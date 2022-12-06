@@ -26,6 +26,7 @@ protected:
 private:
     using Vector3r = msr::airlib::Vector3r;
     using VectorMath = msr::airlib::VectorMath;
+    float time = 0.0;
 
     void createLasers();
     bool shootLaser(const msr::airlib::Pose& lidar_pose, const msr::airlib::Pose& vehicle_pose,

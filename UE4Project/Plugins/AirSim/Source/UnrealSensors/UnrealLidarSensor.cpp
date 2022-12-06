@@ -64,20 +64,36 @@ void UnrealLidarSensor::getPointCloud(const msr::airlib::Pose& lidar_pose, const
 
     const int points_per_scan = 24000;
     int segments = 149;
+    int dx = 0;
+    int dy = 5;
+    int x_inc = 4;
+    int y_inc = 1;
 
     if(params.is_livox) {
-        for (auto laser = 0u; laser < params.number_of_lasers; ++laser)
+        for (auto laser = 0u; laser < 12; ++laser)
         {
-            for (auto i = 0u; i < points_to_scan_with_one_laser; ++i)
+            for (auto i = 0u; i < 2000; ++i)
             {
+                /**
                 //const float horizontal_angle = std::fmod(laser_start + angle_distance_of_laser_measure * i, 360.0f);
                 //const float vertical_angle = laser_angles_[laser];
                 float A_x = 25/2 * sin(2 * PI * (std::fmod(i, segments) / segments)) + 27.5;
                 float A_y = cos(2 * PI * (std::fmod(i, segments) / segments)) + 2;
                 float phi_x = 0;
-                float phi_y = 12 * sin(4 * PI * (std::fmod(i, segments)) / segments);
+                //float phi_y = 12 * sin(4 * PI * (std::fmod(i, segments)) / segments);
+                phi_y = 12 * sin(4 * PI * time_delta);
                 const float horizontal_angle = A_x * sin(2 * PI * i / points_per_scan) + phi_x;
                 const float vertical_angle = A_y * cos(2 * PI * i / points_per_scan) * 0.2 * sin(2 * PI * i / points_per_scan) + 0.5 * phi_y;
+                */
+
+               float A_x = 28;
+               float A_y = 2;
+               const float horizontal_angle = A_x * sin(2 * M_PI * 6 * i  / 2000) + dx;
+               const float vertical_angle = A_y * sin(2 * M_PI * 5 * i / 2000 + 2 * M_PI * time) + dy;
+
+                // check if the laser is outside the requested horizontal FOV
+                if (!VectorMath::isAngleBetweenAngles(horizontal_angle, laser_start, laser_end))
+                    continue;
 
         
                 Vector3r point;
@@ -90,6 +106,19 @@ void UnrealLidarSensor::getPointCloud(const msr::airlib::Pose& lidar_pose, const
                     point_cloud.emplace_back(point.z());
                     segmentation_cloud.emplace_back(segmentationID);
                 }
+            }
+            if (laser < 3) {
+                dx -= x_inc;
+                dy -= y_inc;
+            } else if (laser > 2 && laser < 6) {
+                    dx += x_inc;
+                    dy -= y_inc;
+            } else if (laser > 5 && laser < 9){
+                    dx += x_inc;
+                    dy += y_inc;
+            } else if (laser > 8) {
+                dx -= x_inc;
+                dy += y_inc;
             }
         }
     } else {
@@ -114,6 +143,7 @@ void UnrealLidarSensor::getPointCloud(const msr::airlib::Pose& lidar_pose, const
         }
     }
     }
+    time += 0.1;
 
 
 
