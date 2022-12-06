@@ -64,10 +64,13 @@ void UnrealLidarSensor::getPointCloud(const msr::airlib::Pose& lidar_pose, const
 
     const int points_per_scan = 24000;
     int segments = 149;
-    int dx = 0;
-    int dy = 5;
+    float dx = 0.0;
+    float dy = 25.1/2;
+    //dy = -1;
     int x_inc = 4;
-    int y_inc = 1;
+    int y_inc = (25.1 - 6) / 6;
+    int beams = 12;
+
 
     if(params.is_livox) {
         for (auto laser = 0u; laser < 12; ++laser)
@@ -87,7 +90,7 @@ void UnrealLidarSensor::getPointCloud(const msr::airlib::Pose& lidar_pose, const
                 */
 
                float A_x = 28;
-               float A_y = 2;
+               float A_y = 6;
                const float horizontal_angle = A_x * sin(2 * M_PI * 6 * i  / 2000) + dx;
                const float vertical_angle = A_y * sin(2 * M_PI * 5 * i / 2000 + 2 * M_PI * time) + dy;
 
@@ -143,7 +146,7 @@ void UnrealLidarSensor::getPointCloud(const msr::airlib::Pose& lidar_pose, const
         }
     }
     }
-    time += 0.1;
+    time += 0.01;
 
 
 
