@@ -327,7 +327,7 @@ nav_msgs::Odometry AirsimROSWrapper::get_odom_msg_from_airsim_state(const msr::a
 // https://docs.ros.org/jade/api/sensor_msgs/html/point__cloud__conversion_8h_source.html#l00066
 // look at UnrealLidarSensor.cpp UnrealLidarSensor::getPointCloud() for math
 // read this carefully https://docs.ros.org/kinetic/api/sensor_msgs/html/msg/PointCloud2.html
-sensor_msgs::PointCloud2 AirsimROSWrapper::get_lidar_msg_from_airsim(const std::string &lidar_name, const msr::airlib::LidarData& lidar_data) const
+/* sensor_msgs::PointCloud2 AirsimROSWrapper::get_lidar_msg_from_airsim(const std::string &lidar_name, const msr::airlib::LidarData& lidar_data) const
 {
     sensor_msgs::PointCloud2 lidar_msg;
     lidar_msg.header.frame_id = "fsds/"+lidar_name;
@@ -360,6 +360,34 @@ sensor_msgs::PointCloud2 AirsimROSWrapper::get_lidar_msg_from_airsim(const std::
         const unsigned char *bytes = reinterpret_cast<const unsigned char *>(&data_std[0]);
         std::vector<unsigned char> lidar_msg_data(bytes, bytes + sizeof(float) * data_std.size());
         lidar_msg.data = std::move(lidar_msg_data);
+    }
+    return lidar_msg;
+} */
+
+livox_msgs::Custom AirsimROSWrapper::get_lidar_msg_from_airsim_custom(const std::string &lidar_name, const msr::airlib::LidarData& lidar_data) const
+{
+    livox_msgs::Custom custom_msg;
+    livox_msgs::CustomPoint custom_lidar_msg;
+
+    custom_msg.header.frame_id = "fsds/"+lidar_name;
+    custom_msg.timebase = 0;
+    custom_msg.point_num = 24000;
+    custom_msg.lidar_id = 3;
+    custom_msg.points.clear();
+    custom_msg.header.frame_id = "fsds/"+lidar_name;
+
+    if (lidar_data.point_cloud.size() > 3)
+    {
+        for (size_t d = 0; d < lidar_msg.fields.size(); ++d)
+        {
+            custom_lidar_msg.offset_time = lidar_data.time_stamp;
+            custom_lidar_msg.x = lidar_data.point_cloud.points[d].x;
+            custom_lidar_msg.y = lidar_data.point_cloud.points[d].y;
+            custom_lidar_msg.z = lidar_data.point_cloud.points[d].z;
+            custom_lidar_msg.reflectivity = 230;
+            custom_lidar_msg.line = 0;
+            custom_msg.points.push_back(custom_lidar_msg);
+        }
     }
     return lidar_msg;
 }
@@ -666,7 +694,7 @@ void AirsimROSWrapper::append_static_camera_tf(const std::string& vehicle_name, 
     static_tf_msg_vec_.push_back(static_cam_tf_body_msg);
 }
 
-void AirsimROSWrapper::lidar_timer_cb(const ros::TimerEvent& event, const std::string& lidar_name, const int lidar_index)
+/* void AirsimROSWrapper::lidar_timer_cb(const ros::TimerEvent& event, const std::string& lidar_name, const int lidar_index)
 {
     try
     {
@@ -694,7 +722,39 @@ void AirsimROSWrapper::lidar_timer_cb(const ros::TimerEvent& event, const std::s
         std::cout << "Exception raised by the API, didn't get lidar response." << std::endl
                   << msg << std::endl;
     }
+} */
+
+void AirsimROSWrapper::lidar_timer_cb(const ros::TimerEvent& event, const std::string& lidar_name, const int lidar_index)
+{
+    try
+    {
+        //sensor_msgs::PointCloud2 lidar_msg;
+        livox_msgs::Custom lidar_msg;
+        struct msr::airlib::LidarData lidar_data;
+        {
+            ros_bridge::Timer timer(&getLidarDataVecStatistics[lidar_index]);
+            std::unique_lock<std::recursive_mutex> lck(car_control_mutex_);
+            lidar_data = airsim_client_lidar_.getLidarData(lidar_name, vehicle_name); // airsim api is imu_name, vehicle_name
+            lck.unlock();
+        }
+        lidar_msg = get_lidar_msg_from_airsim_custom(lidar_name, lidar_data);     // todo make const ptr msg to avoid copy
+        lidar_msg.header.frame_id = "fsds/" + lidar_name;
+        lidar_msg.header.stamp = ros::Time::now();
+
+        {
+            ros_bridge::ROSMsgCounter counter(&lidar_pub_vec_statistics[lidar_index]);
+            lidar_pub_vec_[lidar_index].publish(lidar_msg);
+        }
+    }
+
+    catch (rpc::rpc_error& e)
+    {
+        std::string msg = e.get_error().as<std::string>();
+        std::cout << "Exception raised by the API, didn't get lidar response." << std::endl
+                  << msg << std::endl;
+    }
 }
+
 
 /* 
     STATISTICS
