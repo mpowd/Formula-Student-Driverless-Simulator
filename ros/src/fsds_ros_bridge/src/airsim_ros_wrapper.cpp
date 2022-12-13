@@ -364,10 +364,10 @@ nav_msgs::Odometry AirsimROSWrapper::get_odom_msg_from_airsim_state(const msr::a
     return lidar_msg;
 } */
 
-livox_msgs::Custom AirsimROSWrapper::get_lidar_msg_from_airsim_custom(const std::string &lidar_name, const msr::airlib::LidarData& lidar_data) const
+fs_msgs::Custom AirsimROSWrapper::get_lidar_msg_from_airsim_custom(const std::string &lidar_name, const msr::airlib::LidarData& lidar_data) const
 {
-    livox_msgs::Custom custom_msg;
-    livox_msgs::CustomPoint custom_lidar_msg;
+    fs_msgs::Custom custom_msg;
+    fs_msgs::CustomPoint custom_lidar_msg;
 
     custom_msg.header.frame_id = "fsds/"+lidar_name;
     custom_msg.timebase = 0;
@@ -375,21 +375,26 @@ livox_msgs::Custom AirsimROSWrapper::get_lidar_msg_from_airsim_custom(const std:
     custom_msg.lidar_id = 3;
     custom_msg.points.clear();
     custom_msg.header.frame_id = "fsds/"+lidar_name;
+    int j = 0;
 
     if (lidar_data.point_cloud.size() > 3)
     {
-        for (size_t d = 0; d < lidar_msg.fields.size(); ++d)
+        for (size_t d = 0; d < lidar_data.point_cloud.size(); ++d)
         {
             custom_lidar_msg.offset_time = lidar_data.time_stamp;
-            custom_lidar_msg.x = lidar_data.point_cloud.points[d].x;
-            custom_lidar_msg.y = lidar_data.point_cloud.points[d].y;
-            custom_lidar_msg.z = lidar_data.point_cloud.points[d].z;
+            custom_lidar_msg.x = 0;
+            custom_lidar_msg.y = 0;
+            custom_lidar_msg.z = 0;
+            /* if (d == lidar_data.point_cloud.size() - 4) break;
+            custom_lidar_msg.x = lidar_data.point_cloud[d];
+            custom_lidar_msg.y = lidar_data.point_cloud[d];
+            custom_lidar_msg.z = lidar_data.point_cloud[d]; */
             custom_lidar_msg.reflectivity = 230;
             custom_lidar_msg.line = 0;
             custom_msg.points.push_back(custom_lidar_msg);
         }
     }
-    return lidar_msg;
+    return custom_msg;
 }
 
 // todo covariances
@@ -729,7 +734,7 @@ void AirsimROSWrapper::lidar_timer_cb(const ros::TimerEvent& event, const std::s
     try
     {
         //sensor_msgs::PointCloud2 lidar_msg;
-        livox_msgs::Custom lidar_msg;
+        fs_msgs::Custom lidar_msg;
         struct msr::airlib::LidarData lidar_data;
         {
             ros_bridge::Timer timer(&getLidarDataVecStatistics[lidar_index]);
