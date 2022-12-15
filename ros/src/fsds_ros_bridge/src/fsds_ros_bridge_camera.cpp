@@ -13,7 +13,7 @@
 #include "rpc/rpc_error.h"
 #include <cv_bridge/cv_bridge.h>
 #include <math.h>
-
+#include <boost/assign/list_of.hpp>
 
 
 typedef msr::airlib::ImageCaptureBase::ImageRequest ImageRequest;
@@ -69,6 +69,7 @@ CameraInfo getCameraInfo(const std::string camera_name, const std::string vehicl
     CameraInfo response;
     try {
         response = airsim_api->simGetCameraInfo(camera_name, vehicle_name);
+        return response;
     } catch (rpc::rpc_error& e) {
         std::cout << "error" << std::endl;
         std::string msg = e.get_error().as<std::string>();
@@ -106,7 +107,8 @@ void doImageUpdate(const ros::TimerEvent&)
     cam_info_msg.height = img_response.height;
     cam_info_msg.width = img_response.width;
     cam_info_msg.distortion_model = "plump_bob";
-    float flattened_proj_mat[12];
+    boost::array< double, 12 > flattened_proj_mat;
+    
     for (auto q = 0; q < 4; q++)
     {
         for (auto t = 0; t < 3; t++)
@@ -114,14 +116,11 @@ void doImageUpdate(const ros::TimerEvent&)
             flattened_proj_mat[q * 3 + t] = cam_info_response.proj_mat.matrix[q][t];
         }
     }
-    cam_info_msg.P = static_cast<double>(flattened_proj_mat);
-    float f_x = cam_info_msg.width / std::tan(cam_info_response.fov / 2);
-    float f_y = f_x;
-    cam_info_msg.K = {f_x, 0, cam_info_msg.width, 0, f_y, cam_info_msg.height, 0, 0, 1};
-
-
-
     
+    cam_info_msg.P = flattened_proj_mat;
+    float f_x, f_y = cam_info_msg.width / 2;
+    cam_info_msg.K = {f_x, 0, cam_info_msg.width / 2, 0, f_y,  cam_info_msg.height / 2, 0, 0, 1};
+
     image_pub.publish(img_msg);
     image_info_pub.publish(cam_info_msg);
     fps_statistic.addCount();
