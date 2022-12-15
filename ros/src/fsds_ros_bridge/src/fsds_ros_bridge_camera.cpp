@@ -3,6 +3,9 @@
 #include <ros/console.h>
 #include <ros/spinner.h>
 #include <sensor_msgs/Image.h>
+#include <sensor_msgs/CameraInfo.h>
+#include <std_msgs/String.h>
+#include "common/CommonStructs.hpp"
 #include "common/AirSimSettings.hpp"
 #include "common/Common.hpp"
 #include "vehicles/car/api/CarRpcLibClient.hpp"
@@ -16,12 +19,14 @@
 typedef msr::airlib::ImageCaptureBase::ImageRequest ImageRequest;
 typedef msr::airlib::ImageCaptureBase::ImageResponse ImageResponse;
 typedef msr::airlib::ImageCaptureBase::ImageType ImageType;
+typedef msr::airlib::CameraInfo CameraInfo;
 
 // number of seconds to record frames before printing fps
 const int FPS_WINDOW = 3;
 
 msr::airlib::CarRpcLibClient* airsim_api;
 ros::Publisher image_pub;
+ros::Publisher image_info_pub;
 ros_bridge::Statistics fps_statistic;
 
 // settings
@@ -60,9 +65,23 @@ std::vector<ImageResponse> getImage(ImageRequest req) {
     return img_responses;
 }
 
+CameraInfo getCameraInfo(const std::string camera_name, const std::string vehicle_name) {
+    CameraInfo response;
+    try {
+        response = airsim_api->simGetCameraInfo(camera_name, vehicle_name);
+    } catch (rpc::rpc_error& e) {
+        std::cout << "error" << std::endl;
+        std::string msg = e.get_error().as<std::string>();
+        std::cout << "Exception raised by the API while getting image info:" << std::endl
+                << msg << std::endl;
+    }
+}
+
 void doImageUpdate(const ros::TimerEvent&)
 {
     auto img_responses = getImage(ImageRequest(camera_name, ImageType::Scene, false, false));
+    CameraInfo cam_info_response = getCameraInfo(camera_name, "FSCar");
+
 
     // if a render request failed for whatever reason, this img will be empty.
     if (img_responses.size() == 0 || img_responses[0].time_stamp == 0)
@@ -80,8 +99,31 @@ void doImageUpdate(const ros::TimerEvent&)
     img_msg->is_bigendian = 0;
     img_msg->header.stamp = make_ts(img_response.time_stamp);
     img_msg->header.frame_id = "/fsds/camera/"+camera_name;
+
+    sensor_msgs::CameraInfo cam_info_msg;
+    cam_info_msg.header.frame_id = "/fsds/camera/" + camera_name + "/camera_info";
+    cam_info_msg.header.stamp = make_ts(img_response.time_stamp);
+    cam_info_msg.height = img_response.height;
+    cam_info_msg.width = img_response.width;
+    cam_info_msg.distortion_model = "plump_bob";
+    float flattened_proj_mat[12];
+    for (auto q = 0; q < 4; q++)
+    {
+        for (auto t = 0; t < 3; t++)
+        {
+            flattened_proj_mat[q * 3 + t] = cam_info_response.proj_mat.matrix[q][t];
+        }
+    }
+    cam_info_msg.P = static_cast<double>(flattened_proj_mat);
+    float f_x = cam_info_msg.width / std::tan(cam_info_response.fov / 2);
+    float f_y = f_x;
+    cam_info_msg.K = {f_x, 0, cam_info_msg.width, 0, f_y, cam_info_msg.height, 0, 0, 1};
+
+
+
     
     image_pub.publish(img_msg);
+    image_info_pub.publish(cam_info_msg);
     fps_statistic.addCount();
 }
 
@@ -183,6 +225,8 @@ int main(int argc, char ** argv)
 
     // ready topic
     image_pub = nh.advertise<sensor_msgs::Image>("/fsds/camera/" + camera_name, 1);
+    image_info_pub = nh.advertise<sensor_msgs::CameraInfo>("/fsds/camera/" + camera_name + "/camera_info", 1);
+
 
     // start the loop
     ros::Timer imageTimer = nh.createTimer(ros::Duration(1/framerate), depthcamera ? doDepthImageUpdate : doImageUpdate);
