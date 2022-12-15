@@ -19,6 +19,8 @@ STRICT_MODE_OFF //todo what does this do?
 #include <fs_msgs/FinishedSignal.h>
 #include <fs_msgs/Track.h>
 #include <fs_msgs/ExtraInfo.h>
+#include <livox_msgs/Custom.h>
+#include <livox_msgs/CustomPoint.h>
 #include <chrono>
 #include <cv_bridge/cv_bridge.h>
 #include <geometry_msgs/PoseStamped.h>
@@ -158,6 +160,7 @@ private:
     sensor_msgs::NavSatFix get_gps_sensor_msg_from_airsim_geo_point(const msr::airlib::GeoPoint& geo_point) const;
     sensor_msgs::Imu get_imu_msg_from_airsim(const msr::airlib::ImuBase::Output& imu_data);
     sensor_msgs::PointCloud2 get_lidar_msg_from_airsim(const std::string &lidar_name, const msr::airlib::LidarData& lidar_data) const;
+    livox_msgs::Custom get_lidar_msg_from_airsim_custom(const std::string &lidar_name, const msr::airlib::LidarData& lidar_data) const;
     static bool equalsMessage(const nav_msgs::Odometry& a, const nav_msgs::Odometry& b);
 
 
@@ -219,6 +222,7 @@ private:
     ros::Publisher track_pub;
     ros::Publisher go_signal_pub_;
 	ros::Publisher extra_info_pub;
+    ros::Publisher livox_pub;
     
     /// ROS subscribers
     ros::Subscriber control_cmd_sub;

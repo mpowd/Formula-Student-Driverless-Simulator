@@ -66,7 +66,7 @@
             "VerticalFOVLower": -12.55,
             "HorizontalFOVStart": -40.85,
             "HorizontalFOVEnd": 40.85,
-            "RotationsPerSecond": 5,
+            "RotationsPerSecond": 10,
             "DrawDebugPoints": true,
             "IsLivox": true
           },

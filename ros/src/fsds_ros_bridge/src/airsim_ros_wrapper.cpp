@@ -179,6 +179,7 @@ void AirsimROSWrapper::create_ros_pubs_from_settings_json()
         global_gps_pub = nh_.advertise<sensor_msgs::NavSatFix>("gps", 10);
         imu_pub = nh_.advertise<sensor_msgs::Imu>("imu", 10);
         gss_pub = nh_.advertise<geometry_msgs::TwistStamped>("gss", 10);
+        livox_pub = nh_.advertise<livox_msgs::Custom>("livox", 10);
 
         bool UDP_control;
         nh_private_.getParam("UDP_control", UDP_control);
@@ -362,6 +363,38 @@ sensor_msgs::PointCloud2 AirsimROSWrapper::get_lidar_msg_from_airsim(const std::
         lidar_msg.data = std::move(lidar_msg_data);
     }
     return lidar_msg;
+}
+
+livox_msgs::Custom AirsimROSWrapper::get_lidar_msg_from_airsim_custom(const std::string &lidar_name, const msr::airlib::LidarData& lidar_data) const
+{
+    livox_msgs::Custom custom_msg;
+    livox_msgs::CustomPoint custom_point_msg;
+
+    custom_msg.header.frame_id = "livox";
+    custom_msg.timebase = 0;
+    custom_msg.lidar_id = 3;
+    custom_msg.points.clear();
+
+    if (lidar_data.point_cloud.size() > 3)
+    {
+        ROS_INFO("sensor_name: %s . point_cloud_size: %d", lidar_name.c_str(), lidar_data.point_cloud.size());
+        size_t i_y = 1;
+        size_t i_z = 2;
+        int nth = 3;
+        for (size_t i = 0; i < lidar_data.point_cloud.size(); i+=nth, i_y=nth, i_z+=nth)
+        {
+            custom_point_msg.offset_time = lidar_data.time_stamp;
+            custom_point_msg.x = lidar_data.point_cloud[i];
+            custom_point_msg.y = lidar_data.point_cloud[i_y];
+            custom_point_msg.z = lidar_data.point_cloud[i_z];
+            custom_point_msg.reflectivity = 230;
+            custom_point_msg.line = 0;
+            custom_msg.points.push_back(custom_point_msg);
+        }
+    }
+    ROS_INFO("CUSTOM POINT: %d", custom_msg.points.size());
+    custom_msg.point_num = custom_msg.points.size();
+    return custom_msg;
 }
 
 // todo covariances
@@ -666,7 +699,7 @@ void AirsimROSWrapper::append_static_camera_tf(const std::string& vehicle_name, 
     static_tf_msg_vec_.push_back(static_cam_tf_body_msg);
 }
 
-void AirsimROSWrapper::lidar_timer_cb(const ros::TimerEvent& event, const std::string& lidar_name, const int lidar_index)
+/* void AirsimROSWrapper::lidar_timer_cb(const ros::TimerEvent& event, const std::string& lidar_name, const int lidar_index)
 {
     try
     {
@@ -679,6 +712,47 @@ void AirsimROSWrapper::lidar_timer_cb(const ros::TimerEvent& event, const std::s
             lck.unlock();
         }
         lidar_msg = get_lidar_msg_from_airsim(lidar_name, lidar_data);     // todo make const ptr msg to avoid copy
+        lidar_msg.header.frame_id = "fsds/" + lidar_name;
+        lidar_msg.header.stamp = ros::Time::now();
+
+        {
+            ros_bridge::ROSMsgCounter counter(&lidar_pub_vec_statistics[lidar_index]);
+            lidar_pub_vec_[lidar_index].publish(lidar_msg);
+        }
+    }
+
+    catch (rpc::rpc_error& e)
+    {
+        std::string msg = e.get_error().as<std::string>();
+        std::cout << "Exception raised by the API, didn't get lidar response." << std::endl
+                  << msg << std::endl;
+    }
+} */
+
+void AirsimROSWrapper::lidar_timer_cb(const ros::TimerEvent& event, const std::string& lidar_name, const int lidar_index)
+{
+    try
+    {
+        sensor_msgs::PointCloud2 lidar_msg;
+        livox_msgs::Custom livox_msg;
+        struct msr::airlib::LidarData lidar_data;
+        {
+            ros_bridge::Timer timer(&getLidarDataVecStatistics[lidar_index]);
+            std::unique_lock<std::recursive_mutex> lck(car_control_mutex_);
+            lidar_data = airsim_client_lidar_.getLidarData(lidar_name, vehicle_name); // airsim api is imu_name, vehicle_name
+            lck.unlock();
+        }
+        lidar_msg = get_lidar_msg_from_airsim(lidar_name, lidar_data);
+        
+        if (lidar_name == "Livox") 
+        {
+            livox_msg = get_lidar_msg_from_airsim_custom(lidar_name, lidar_data);
+            livox_msg.header.frame_id = "livox";
+            livox_msg.header.stamp = ros::Time::now();
+
+            livox_pub.publish(livox_msg);
+        } 
+        
         lidar_msg.header.frame_id = "fsds/" + lidar_name;
         lidar_msg.header.stamp = ros::Time::now();
 

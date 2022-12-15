@@ -75,7 +75,7 @@ void UnrealLidarSensor::getPointCloud(const msr::airlib::Pose& lidar_pose, const
     if(params.is_livox) {
         for (auto laser = 0u; laser < 12; ++laser)
         {
-            for (auto i = 0u; i < 2000; ++i)
+            for (auto i = 0u; i < 2850; ++i)
             {
                 /**
                 //const float horizontal_angle = std::fmod(laser_start + angle_distance_of_laser_measure * i, 360.0f);
@@ -146,7 +146,7 @@ void UnrealLidarSensor::getPointCloud(const msr::airlib::Pose& lidar_pose, const
         }
     }
     }
-    time += 0.01;
+    time += 0.1;
 
 
 
