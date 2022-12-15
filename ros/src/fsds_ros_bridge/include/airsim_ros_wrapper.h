@@ -222,6 +222,7 @@ private:
     ros::Publisher track_pub;
     ros::Publisher go_signal_pub_;
 	ros::Publisher extra_info_pub;
+    ros::Publisher livox_pub;
     
     /// ROS subscribers
     ros::Subscriber control_cmd_sub;
