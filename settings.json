@@ -67,7 +67,7 @@
             "HorizontalFOVStart": -40.85,
             "HorizontalFOVEnd": 40.85,
             "RotationsPerSecond": 10,
-            "DrawDebugPoints": true,
+            "DrawDebugPoints": false,
             "IsLivox": true
           },
           "GSS" : {
@@ -80,8 +80,8 @@
             "CaptureSettings": [
             {
                 "ImageType": 0,
-                "Width": 785,
-                "Height": 785,
+                "Width": 640,
+                "Height": 360,
                 "FOV_Degrees": 90
             }
             ],
@@ -96,8 +96,8 @@
             "CaptureSettings": [
               {
                 "ImageType": 0,
-                "Width": 785,
-                "Height": 785,
+                "Width": 640,
+                "Height": 360,
                 "FOV_Degrees": 90
               }
             ],
