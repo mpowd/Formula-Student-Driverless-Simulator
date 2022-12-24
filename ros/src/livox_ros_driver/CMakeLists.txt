@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(livox_msgs)
+project(livox_ros_driver)
 
 find_package(catkin REQUIRED COMPONENTS
   message_generation
@@ -9,7 +9,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 add_message_files(
   FILES
-  Custom.msg
+  CustomMsg.msg
   CustomPoint.msg
 )
 

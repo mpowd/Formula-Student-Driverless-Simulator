@@ -179,7 +179,7 @@ void AirsimROSWrapper::create_ros_pubs_from_settings_json()
         global_gps_pub = nh_.advertise<sensor_msgs::NavSatFix>("gps", 10);
         imu_pub = nh_.advertise<sensor_msgs::Imu>("imu", 10);
         gss_pub = nh_.advertise<geometry_msgs::TwistStamped>("gss", 10);
-        livox_pub = nh_.advertise<livox_msgs::Custom>("livox", 10);
+        livox_pub = nh_.advertise<livox_ros_driver::CustomMsg>("livox", 10);
 
         bool UDP_control;
         nh_private_.getParam("UDP_control", UDP_control);
@@ -365,10 +365,10 @@ sensor_msgs::PointCloud2 AirsimROSWrapper::get_lidar_msg_from_airsim(const std::
     return lidar_msg;
 }
 
-livox_msgs::Custom AirsimROSWrapper::get_lidar_msg_from_airsim_custom(const std::string &lidar_name, const msr::airlib::LidarData& lidar_data) const
+livox_ros_driver::CustomMsg AirsimROSWrapper::get_lidar_msg_from_airsim_custom(const std::string &lidar_name, const msr::airlib::LidarData& lidar_data) const
 {
-    livox_msgs::Custom custom_msg;
-    livox_msgs::CustomPoint custom_point_msg;
+    livox_ros_driver::CustomMsg custom_msg;
+    livox_ros_driver::CustomPoint custom_point_msg;
 
     custom_msg.header.frame_id = "livox";
     custom_msg.timebase = 0;
@@ -381,7 +381,7 @@ livox_msgs::Custom AirsimROSWrapper::get_lidar_msg_from_airsim_custom(const std:
         size_t i_y = 1;
         size_t i_z = 2;
         int nth = 3;
-        for (size_t i = 0; i < lidar_data.point_cloud.size(); i+=nth, i_y=nth, i_z+=nth)
+        for (size_t i = 0; i < lidar_data.point_cloud.size(); i+=nth, i_y+=nth, i_z+=nth)
         {
             custom_point_msg.offset_time = lidar_data.time_stamp;
             custom_point_msg.x = lidar_data.point_cloud[i];
@@ -734,7 +734,7 @@ void AirsimROSWrapper::lidar_timer_cb(const ros::TimerEvent& event, const std::s
     try
     {
         sensor_msgs::PointCloud2 lidar_msg;
-        livox_msgs::Custom livox_msg;
+        livox_ros_driver::CustomMsg livox_msg;
         struct msr::airlib::LidarData lidar_data;
         {
             ros_bridge::Timer timer(&getLidarDataVecStatistics[lidar_index]);

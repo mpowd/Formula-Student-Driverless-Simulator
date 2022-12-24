@@ -36,7 +36,7 @@ find_package(catkin REQUIRED COMPONENTS
   tf2
   tf2_ros
   fs_msgs
-  livox_msgs
+  livox_ros_driver
 )
 
 catkin_package(
