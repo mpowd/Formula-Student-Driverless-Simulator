@@ -101,7 +101,7 @@ void doImageUpdate(const ros::TimerEvent&)
     img_msg->header.stamp = make_ts(img_response.time_stamp);
     img_msg->header.frame_id = "/fsds/camera/"+camera_name;
 
-    sensor_msgs::CameraInfo cam_info_msg;
+    /* sensor_msgs::CameraInfo cam_info_msg;
     cam_info_msg.header.frame_id = "/fsds/camera/" + camera_name + "/camera_info";
     cam_info_msg.header.stamp = make_ts(img_response.time_stamp);
     cam_info_msg.height = img_response.height;
@@ -119,11 +119,7 @@ void doImageUpdate(const ros::TimerEvent&)
     
     cam_info_msg.P = flattened_proj_mat;
     float f_x, f_y = cam_info_msg.width / 2;
-    cam_info_msg.K = {f_x, 0, cam_info_msg.width / 2, 0, f_y,  cam_info_msg.height / 2, 0, 0, 1};
-
-    image_pub.publish(img_msg);
-    image_info_pub.publish(cam_info_msg);
-    fps_statistic.addCount();
+    cam_info_msg.K = {f_x, 0, cam_info_msg.width / 2, 0, f_y,  cam_info_msg.height / 2, 0, 0, 1}; */
 }
 
 cv::Mat manual_decode_depth(const ImageResponse& img_response)

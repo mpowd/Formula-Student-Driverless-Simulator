@@ -40,6 +40,7 @@ void AirsimROSWrapper::initialize_airsim()
     try
     {
         airsim_client_.confirmConnection();
+        airsim_client_images_.confirmConnection();
         airsim_client_lidar_.confirmConnection();
     }
     catch (rpc::rpc_error& e)
@@ -162,6 +163,7 @@ void AirsimROSWrapper::create_ros_pubs_from_settings_json()
     // vehicle_imu_map_;
     // callback_queues_.clear();
 
+    image_transport::ImageTransport image_transporter(nh_private_);
 
     // iterate over std::map<std::string, std::unique_ptr<VehicleSetting>> vehicles;
     for (const auto& curr_vehicle_elem : msr::airlib::AirSimSettings::singleton().vehicles)
@@ -203,9 +205,37 @@ void AirsimROSWrapper::create_ros_pubs_from_settings_json()
             auto& curr_camera_name = curr_camera_elem.first;
             set_nans_to_zeros_in_pose(*vehicle_setting, camera_setting);
             append_static_camera_tf(curr_vehicle_name, curr_camera_name, camera_setting);
-            
-        }
+            // camera_setting.gimbal
+            std::vector<ImageRequest> current_image_request_vec;
+            current_image_request_vec.clear();
 
+            for (const auto& curr_capture_elem : camera_setting.capture_settings)
+            {
+                auto& capture_setting = curr_capture_elem.second;
+
+                // todo why does AirSimSettings::loadCaptureSettings calls AirSimSettings::initializeCaptureSettings()
+                // which initializes default capture settings for _all_ NINE msr::airlib::ImageCaptureBase::ImageType
+                if ( !(std::isnan(capture_setting.fov_degrees)) )
+                {
+                    ImageType curr_image_type = msr::airlib::Utils::toEnum<ImageType>(capture_setting.image_type);
+                    // if scene / segmentation / surface normals / infrared, get uncompressed image with pixels_as_floats = false
+                    if (capture_setting.image_type == 0 || capture_setting.image_type == 5 || capture_setting.image_type == 6 || capture_setting.image_type == 7)
+                    {
+                        current_image_request_vec.push_back(ImageRequest(curr_camera_name, curr_image_type, false, false));
+                    }
+                    // if {DepthPlanner, DepthPerspective,DepthVis, DisparityNormalized}, get float image
+                    else
+                    {
+                        current_image_request_vec.push_back(ImageRequest(curr_camera_name, curr_image_type, true));
+                    }
+
+                    image_pub_vec_.push_back(image_transporter.advertise(curr_vehicle_name + "/" + curr_camera_name + "/" + image_type_int_to_string_map_.at(capture_setting.image_type), 1));
+                    cam_info_pub_vec_.push_back(nh_private_.advertise<sensor_msgs::CameraInfo> (curr_vehicle_name + "/" + curr_camera_name + "/" + image_type_int_to_string_map_.at(capture_setting.image_type) + "/camera_info", 10));
+                    camera_info_msg_vec_.push_back(generate_cam_info(curr_camera_name, camera_setting, capture_setting));
+                }
+            }
+            airsim_img_request_vehicle_name_pair_vec_.push_back(std::make_pair(current_image_request_vec, curr_vehicle_name));
+        }
         // iterate over sensors std::map<std::string, std::unique_ptr<SensorSetting>> sensors;
         for (auto& curr_sensor_map : vehicle_setting->sensors)
         {
@@ -257,6 +287,23 @@ void AirsimROSWrapper::create_ros_pubs_from_settings_json()
                 std::cout << sensor_setting->sensor_name << std::endl;
                 throw std::invalid_argument("Unexpected sensor type (D)");
             }
+            }
+        }
+         // if >0 cameras, add one more thread for img_request_timer_cb
+        if(airsim_img_request_vehicle_name_pair_vec_.size() > 0)
+        {
+            double update_airsim_img_response_every_n_sec;
+            nh_private_.getParam("update_airsim_img_response_every_n_sec", update_airsim_img_response_every_n_sec);
+            bool separate_spinner = true; // todo debugging race condition
+            if(separate_spinner)
+            {
+                ros::TimerOptions timer_options(ros::Duration(update_airsim_img_response_every_n_sec), boost::bind(&AirsimROSWrapper::img_response_timer_cb, this, _1), &img_timer_cb_queue_);
+                airsim_img_response_timer_ = nh_private_.createTimer(timer_options);
+                is_used_img_timer_cb_queue_ = true;
+            }
+            else
+            {
+                airsim_img_response_timer_ = nh_private_.createTimer(ros::Duration(update_airsim_img_response_every_n_sec), &AirsimROSWrapper::img_response_timer_cb, this);
             }
         }
     }
@@ -729,6 +776,33 @@ void AirsimROSWrapper::append_static_camera_tf(const std::string& vehicle_name, 
     }
 } */
 
+void AirsimROSWrapper::img_response_timer_cb(const ros::TimerEvent& event)
+{    
+    try
+    {
+        int image_response_idx = 0;
+        for (const auto& airsim_img_request_vehicle_name_pair : airsim_img_request_vehicle_name_pair_vec_)
+        {
+            std::unique_lock<std::recursive_mutex> lck(car_control_mutex_);
+            const std::vector<ImageResponse>& img_response = airsim_client_images_.simGetImages(airsim_img_request_vehicle_name_pair.first, airsim_img_request_vehicle_name_pair.second);
+            lck.unlock();
+
+            if (img_response.size() == airsim_img_request_vehicle_name_pair.first.size()) 
+            {
+                process_and_publish_img_response(img_response, image_response_idx, airsim_img_request_vehicle_name_pair.second);
+                image_response_idx += img_response.size();
+            }            
+        }
+    }
+
+    catch (rpc::rpc_error& e)
+    {
+        std::string msg = e.get_error().as<std::string>();
+        std::cout << "Exception raised by the API, didn't get image response." << std::endl << msg << std::endl;
+    }
+
+}
+
 void AirsimROSWrapper::lidar_timer_cb(const ros::TimerEvent& event, const std::string& lidar_name, const int lidar_index)
 {
     try
@@ -768,6 +842,27 @@ void AirsimROSWrapper::lidar_timer_cb(const ros::TimerEvent& event, const std::s
         std::cout << "Exception raised by the API, didn't get lidar response." << std::endl
                   << msg << std::endl;
     }
+}
+
+// todo have a special stereo pair mode and get projection matrix by calculating offset wrt drone body frame?
+sensor_msgs::CameraInfo AirsimROSWrapper::generate_cam_info(const std::string& camera_name,
+                                                            const CameraSetting& camera_setting,
+                                                            const CaptureSetting& capture_setting) const
+{
+    sensor_msgs::CameraInfo cam_info_msg;
+    cam_info_msg.header.frame_id = camera_name + "/" + image_type_int_to_string_map_.at(capture_setting.image_type) + "_optical";
+    cam_info_msg.height = capture_setting.height;
+    cam_info_msg.width = capture_setting.width;
+    float f_x = (capture_setting.width / 2.0) / tan(math_common::deg2rad(capture_setting.fov_degrees / 2.0));
+    // todo focal length in Y direction should be same as X it seems. this can change in future a scene capture component which exactly correponds to a cine camera
+    // float f_y = (capture_setting.height / 2.0) / tan(math_common::deg2rad(fov_degrees / 2.0));
+    cam_info_msg.K = {f_x, 0.0, capture_setting.width / 2.0, 
+                        0.0, f_x, capture_setting.height / 2.0, 
+                        0.0, 0.0, 1.0};
+    cam_info_msg.P = {f_x, 0.0, capture_setting.width / 2.0, 0.0,
+                        0.0, f_x, capture_setting.height / 2.0, 0.0, 
+                        0.0, 0.0, 1.0, 0.0};
+    return cam_info_msg;
 }
 
 /* 

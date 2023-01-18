@@ -11,5 +11,3 @@ site
 # compiled python files
 *.pyc
 __pycache__/
-
-ros/src/fsds_ros_bridge/launch/fsds_ros_bridge.launch

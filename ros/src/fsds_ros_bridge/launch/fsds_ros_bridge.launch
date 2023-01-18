@@ -1,6 +1,6 @@
 <launch>
 
-	<arg name="host" default="192.168.178.42" />
+	<arg name="host" default="localhost" />
 	<arg name="mission_name" default="trackdrive"/>
 	<arg name="track_name" default="A"/>
 	<arg name="competition_mode" default="false"/>

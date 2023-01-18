@@ -51,10 +51,14 @@ STRICT_MODE_OFF //todo what does this do?
 #include <fstream>
 #include <curl/curl.h>
 #include <ros/transport_hints.h>
+#include <image_transport/image_transport.h>
 // #include "nodelet/nodelet.h"
 #define printVariableNameAndValue(x) std::cout << "The name of variable **" << (#x) << "** and the value of variable is => " << x << "\n"
 
-    // todo move airlib typedefs to separate header file?
+    // todo move airlib typedefs to separate header file?    
+typedef msr::airlib::ImageCaptureBase::ImageRequest ImageRequest;
+typedef msr::airlib::ImageCaptureBase::ImageResponse ImageResponse;
+typedef msr::airlib::ImageCaptureBase::ImageType ImageType;
 typedef msr::airlib::AirSimSettings::CaptureSetting CaptureSetting;
 typedef msr::airlib::AirSimSettings::VehicleSetting VehicleSetting;
 typedef msr::airlib::AirSimSettings::CameraSetting CameraSetting;
@@ -122,6 +126,7 @@ private:
     void ResetStatistics();
 
     /// ROS timer callbacks
+    void img_response_timer_cb(const ros::TimerEvent& event); // update images from airsim_client_ every nth sec
     void odom_cb(const ros::TimerEvent& event);    // update drone state from airsim_client_ every nth sec
     void gps_timer_cb(const ros::TimerEvent& event);
     void imu_timer_cb(const ros::TimerEvent& event);
@@ -141,6 +146,13 @@ private:
 
     /// ROS service callbacks
     bool reset_srv_cb(fs_msgs::Reset::Request& request, fs_msgs::Reset::Response& response);
+
+     /// camera helper methods
+    sensor_msgs::CameraInfo generate_cam_info(const std::string& camera_name, const CameraSetting& camera_setting, const CaptureSetting& capture_setting) const;
+    cv::Mat manual_decode_depth(const ImageResponse& img_response) const;
+    sensor_msgs::ImagePtr get_img_msg_from_response(const ImageResponse& img_response, const ros::Time curr_ros_time, const std::string frame_id) const;
+    sensor_msgs::ImagePtr get_depth_img_msg_from_response(const ImageResponse& img_response, const ros::Time curr_ros_time, const std::string frame_id) const;
+    void process_and_publish_img_response(const std::vector<ImageResponse>& img_response_vec, const int img_response_idx, const std::string& vehicle_name);
 
     // methods which parse setting json ang generate ros pubsubsrv
     void create_ros_pubs_from_settings_json();
@@ -182,6 +194,7 @@ private:
 
     msr::airlib::CarRpcLibClient airsim_client_;
     msr::airlib::CarRpcLibClient airsim_client_lidar_;
+    msr::airlib::CarRpcLibClient airsim_client_images_;
 
     nav_msgs::Odometry message_enu_previous_;
 
@@ -191,6 +204,7 @@ private:
     // todo not sure if async spinners shuold be inside this class, or should be instantiated in fsds_ros_bridge.cpp, and cb queues should be public
     // todo for multiple drones with multiple sensors, this won't scale. make it a part of MultiRotorROS?
     ros::CallbackQueue lidar_timer_cb_queue_;
+    ros::CallbackQueue img_timer_cb_queue_;
 
     // todo race condition
     std::recursive_mutex car_control_mutex_;
@@ -209,8 +223,16 @@ private:
     ros::Timer go_signal_timer_;
     ros::Timer statictf_timer_;
 	ros::Timer extra_info_timer_;
+    ros::Timer airsim_img_response_timer_;
 
+    typedef std::pair<std::vector<ImageRequest>, std::string> airsim_img_request_vehicle_name_pair;
+    std::vector<airsim_img_request_vehicle_name_pair> airsim_img_request_vehicle_name_pair_vec_;
+    std::vector<image_transport::Publisher> image_pub_vec_;
+    static const std::unordered_map<int, std::string> image_type_int_to_string_map_;
+    std::vector<ros::Publisher> cam_info_pub_vec_;
     std::vector<ros::Publisher> lidar_pub_vec_;
+
+    std::vector<sensor_msgs::CameraInfo> camera_info_msg_vec_;
 
 
     /// ROS publishers
@@ -227,4 +249,13 @@ private:
     /// ROS subscribers
     ros::Subscriber control_cmd_sub;
     ros::Subscriber finished_signal_sub_;
+
+    static constexpr char CAM_YML_NAME[]    = "camera_name";
+    static constexpr char WIDTH_YML_NAME[]  = "image_width";
+    static constexpr char HEIGHT_YML_NAME[] = "image_height";
+    static constexpr char K_YML_NAME[]      = "camera_matrix";
+    static constexpr char D_YML_NAME[]      = "distortion_coefficients";
+    static constexpr char R_YML_NAME[]      = "rectification_matrix";
+    static constexpr char P_YML_NAME[]      = "projection_matrix";
+    static constexpr char DMODEL_YML_NAME[] = "distortion_model";
 };
