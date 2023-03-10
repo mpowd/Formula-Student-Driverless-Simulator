@@ -14,7 +14,7 @@
 #include <cv_bridge/cv_bridge.h>
 #include <math.h>
 #include <boost/assign/list_of.hpp>
-
+#include <math_common.h>
 
 typedef msr::airlib::ImageCaptureBase::ImageRequest ImageRequest;
 typedef msr::airlib::ImageCaptureBase::ImageResponse ImageResponse;
@@ -118,8 +118,11 @@ void doImageUpdate(const ros::TimerEvent&)
     }
     
     cam_info_msg.P = flattened_proj_mat;
-    float f_x, f_y = cam_info_msg.width / 2;
-    cam_info_msg.K = {f_x, 0, cam_info_msg.width / 2, 0, f_y,  cam_info_msg.height / 2, 0, 0, 1};
+    float f_x = (cam_info_msg.width / 2.0) / tan(math_common::deg2rad(cam_info_response.fov / 2.0));
+
+    cam_info_msg.K = {f_x, 0.0, cam_info_msg.width / 2.0, 
+                        0.0, f_x, cam_info_msg.height / 2.0, 
+                        0.0, 0.0, 1.0}; 
 
     image_pub.publish(img_msg);
     image_info_pub.publish(cam_info_msg);
