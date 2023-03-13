@@ -377,7 +377,6 @@ livox_ros_driver::CustomMsg AirsimROSWrapper::get_lidar_msg_from_airsim_custom(c
 
     if (lidar_data.point_cloud.size() > 3)
     {
-        ROS_INFO("sensor_name: %s . point_cloud_size: %d", lidar_name.c_str(), lidar_data.point_cloud.size());
         size_t i_y = 1;
         size_t i_z = 2;
         int nth = 3;
@@ -392,7 +391,8 @@ livox_ros_driver::CustomMsg AirsimROSWrapper::get_lidar_msg_from_airsim_custom(c
             custom_msg.points.push_back(custom_point_msg);
         }
     }
-    ROS_INFO("CUSTOM POINT: %d", custom_msg.points.size());
+    // To see if the point cloud contains enough points
+    //ROS_INFO("CUSTOM POINT: %d", custom_msg.points.size());
     custom_msg.point_num = custom_msg.points.size();
     return custom_msg;
 }
