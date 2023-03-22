@@ -75,6 +75,7 @@ void UnrealLidarSensor::getPointCloud(const msr::airlib::Pose& lidar_pose, const
     if(params.is_livox) {
         for (auto laser = 0u; laser < 12; ++laser)
         {
+            // The number 2850 gives us ~24000 points for the livox point cloud.
             for (auto i = 0u; i < 2850; ++i)
             {
                 /**
